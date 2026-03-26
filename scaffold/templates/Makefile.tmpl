@@ -1,7 +1,7 @@
 .PHONY: help check eval test test-e2e dev
 
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*14915' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m                    \033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 check: eval test ## Run all pre-push checks
 
@@ -10,12 +10,12 @@ eval: ## Run safety evals (compose-validate + destructive-op)
 	@bash evals/compose-validate.sh
 
 test: ## Run unit + API + auth tests (targeting staging Supabase)
-	cd backend && npm test
-	cd frontend && npm test
-	pytest tests/ -v
+	(cd backend && npm test)
+	(cd frontend && npm test)
+	PYTHONPATH=tests pytest tests/ -v
 
 test-e2e: ## Run E2E tests
-	cd tests/e2e && npx playwright test
+	(cd tests/e2e && npx playwright test)
 
 dev: ## Start local dev environment
 	docker compose -f docker-compose.yml up -d

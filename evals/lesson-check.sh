@@ -17,7 +17,29 @@ if [ -z "$STACKS" ]; then
 fi
 for stack in $STACKS; do
   echo "Checking lessons for stack: $stack"
-  RESPONSE=$(curl -s --fail-with-body -X POST "$OPENBRAIN_URL/mcp" -H "Content-Type: application/json" -H "x-brain-key: $OPENBRAIN_KEY" -d "{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "search_deployment_lessons", "arguments": {"stack": "$stack", "limit": 10}}}" 2>/dev/null || echo "{}")
+
+  # Build JSON payload via python3 to safely encode $stack.
+  # Direct bash interpolation into JSON breaks on special characters (quotes, backslashes).
+  PAYLOAD=$(python3 -c "
+import json, sys
+stack = sys.argv[1]
+payload = {
+    'jsonrpc': '2.0',
+    'id': 1,
+    'method': 'tools/call',
+    'params': {
+        'name': 'search_deployment_lessons',
+        'arguments': {'stack': stack, 'limit': 10}
+    }
+}
+print(json.dumps(payload))
+" "$stack" 2>/dev/null)
+
+  RESPONSE=$(curl -s --fail-with-body -X POST "$OPENBRAIN_URL/mcp" \
+    -H "Content-Type: application/json" \
+    -H "x-brain-key: $OPENBRAIN_KEY" \
+    -d "$PAYLOAD" \
+    2>/dev/null || echo "{}")
   if [ "$RESPONSE" = "{}" ]; then
     eval_warn "OpenBrain unreachable for stack $stack — skipping lesson check"
     continue

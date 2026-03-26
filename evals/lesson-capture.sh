@@ -16,7 +16,33 @@ COMMIT="${GITHUB_SHA:-unknown}"
 COMMIT_SHORT="${COMMIT:0:7}"
 WORKFLOW="${GITHUB_WORKFLOW:-manual}"
 LESSON="[CI] $DESCRIPTION (branch: $BRANCH, commit: $COMMIT_SHORT, workflow: $WORKFLOW)"
-CAPTURE_RESULT=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$OPENBRAIN_URL/mcp" -H "Content-Type: application/json" -H "x-brain-key: $OPENBRAIN_KEY" -d "{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_deployment_lesson", "arguments": {"stack": "$STACK", "category": "$CATEGORY", "severity": "$SEVERITY", "lesson": "$LESSON"}}}" 2>/dev/null || echo "000")
+
+# Build JSON payload via python3 to safely encode all fields.
+# Direct bash interpolation breaks on special characters in $LESSON (quotes, parens, etc).
+PAYLOAD=$(python3 -c "
+import json, sys
+payload = {
+    'jsonrpc': '2.0',
+    'id': 1,
+    'method': 'tools/call',
+    'params': {
+        'name': 'add_deployment_lesson',
+        'arguments': {
+            'stack': sys.argv[1],
+            'category': sys.argv[2],
+            'severity': sys.argv[3],
+            'lesson': sys.argv[4]
+        }
+    }
+}
+print(json.dumps(payload))
+" "$STACK" "$CATEGORY" "$SEVERITY" "$LESSON" 2>/dev/null)
+
+CAPTURE_RESULT=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$OPENBRAIN_URL/mcp" \
+  -H "Content-Type: application/json" \
+  -H "x-brain-key: $OPENBRAIN_KEY" \
+  -d "$PAYLOAD" \
+  2>/dev/null || echo "000")
 if [ "$CAPTURE_RESULT" = "200" ]; then
   echo "Lesson captured to OpenBrain: $LESSON"
 else

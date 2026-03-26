@@ -1,0 +1,65 @@
+# Example: how homelab-configs/.github/workflows/ci.yml references homelab-platform.
+# Copy this to homelab-configs/.github/workflows/ci.yml and add the required secrets:
+#   PLATFORM_TOKEN  — fine-grained PAT, contents:read on AlbertvD/homelab-platform
+#   OPENBRAIN_KEY   — OpenBrain API key (optional, lesson gate degrades gracefully)
+# Required variable (repo → Settings → Variables):
+#   OPENBRAIN_URL   — OpenBrain MCP endpoint
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  safety:
+    uses: AlbertvD/homelab-platform/.github/workflows/safety.yml@v1
+    with:
+      run_compose_validate: true
+    secrets: inherit
+
+  build-traefik:
+    needs: safety
+    if: github.ref == 'refs/heads/main'
+    uses: AlbertvD/homelab-platform/.github/workflows/build-push.yml@v1
+    with:
+      context: ./services/traefik
+      dockerfile: ./services/traefik/Dockerfile
+      image_name: traefik-custom
+      registry: ghcr.io/albertvd/homelab-configs
+    secrets: inherit
+
+  build-bind9:
+    needs: safety
+    if: github.ref == 'refs/heads/main'
+    uses: AlbertvD/homelab-platform/.github/workflows/build-push.yml@v1
+    with:
+      context: ./services/bind9-duin
+      dockerfile: ./services/bind9-duin/Dockerfile
+      image_name: bind9-duin
+      registry: ghcr.io/albertvd/homelab-configs
+    secrets: inherit
+
+  build-homepage:
+    needs: safety
+    if: github.ref == 'refs/heads/main'
+    uses: AlbertvD/homelab-platform/.github/workflows/build-push.yml@v1
+    with:
+      context: ./services/homepage
+      dockerfile: ./services/homepage/Dockerfile
+      image_name: homepage
+      registry: ghcr.io/albertvd/homelab-configs
+    secrets: inherit
+
+  build-prometheus:
+    needs: safety
+    if: github.ref == 'refs/heads/main'
+    uses: AlbertvD/homelab-platform/.github/workflows/build-push.yml@v1
+    with:
+      context: ./services/prometheus
+      dockerfile: ./services/prometheus/Dockerfile
+      image_name: prometheus-custom
+      registry: ghcr.io/albertvd/homelab-configs
+    secrets: inherit

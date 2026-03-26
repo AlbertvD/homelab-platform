@@ -5,13 +5,40 @@ PLATFORM_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT_DIR="$(pwd)"
 install_claude_code_hooks() {
   echo "Installing Claude Code hooks..."
-  mkdir -p "$PROJECT_DIR/src/hooks" "$PROJECT_DIR/src/lib"
+
+  # Default install paths match homelab-configs layout (src/hooks/, src/lib/).
+  # Override with env vars if your project uses a different structure:
+  #   HOOKS_TARGET_DIR=.claude/hooks HOOKS_LIB_DIR=src/lib bash install.sh --claude-code
+  HOOKS_TARGET_DIR="${HOOKS_TARGET_DIR:-src/hooks}"
+  HOOKS_LIB_DIR="${HOOKS_LIB_DIR:-src/lib}"
+
+  mkdir -p "$PROJECT_DIR/$HOOKS_TARGET_DIR" "$PROJECT_DIR/$HOOKS_LIB_DIR"
+
   for hook in pre-tool-use.ts post-tool-use.ts stop.ts; do
-    if [ -f "$PLATFORM_DIR/hooks/claude-code/$hook" ]; then cp "$PLATFORM_DIR/hooks/claude-code/$hook" "$PROJECT_DIR/src/hooks/$hook"; fi
-done
-  if [ -f "$PLATFORM_DIR/hooks/claude-code/lib/hook-utils.ts" ]; then cp "$PLATFORM_DIR/hooks/claude-code/lib/hook-utils.ts" "$PROJECT_DIR/src/lib/hook-utils.ts"; fi
+    if [ -f "$PLATFORM_DIR/hooks/claude-code/$hook" ]; then
+      cp "$PLATFORM_DIR/hooks/claude-code/$hook" "$PROJECT_DIR/$HOOKS_TARGET_DIR/$hook"
+      echo "  Copied: $HOOKS_TARGET_DIR/$hook"
+    fi
+  done
+
+  if [ -f "$PLATFORM_DIR/hooks/claude-code/lib/hook-utils.ts" ]; then
+    cp "$PLATFORM_DIR/hooks/claude-code/lib/hook-utils.ts" "$PROJECT_DIR/$HOOKS_LIB_DIR/hook-utils.ts"
+    echo "  Copied: $HOOKS_LIB_DIR/hook-utils.ts"
+  fi
+
   PLATFORM_SHA=$(git -C "$PLATFORM_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-  echo "$PLATFORM_SHA" > "$PROJECT_DIR/src/hooks/.platform-version"
+  echo "$PLATFORM_SHA" > "$PROJECT_DIR/$HOOKS_TARGET_DIR/.platform-version"
+  echo "  Wrote: $HOOKS_TARGET_DIR/.platform-version ($PLATFORM_SHA)"
+
+  echo ""
+  echo "Add to your .claude/settings.json (adjust paths if you used custom HOOKS_TARGET_DIR):"
+  echo '  "hooks": {'
+  echo "    \"PreToolUse\": [{ \"type\": \"command\", \"command\": \"~/.bun/bin/bun run $HOOKS_TARGET_DIR/pre-tool-use.ts\" }],"
+  echo "    \"PostToolUse\": [{ \"type\": \"command\", \"command\": \"~/.bun/bin/bun run $HOOKS_TARGET_DIR/post-tool-use.ts\" }],"
+  echo "    \"Stop\": [{ \"type\": \"command\", \"command\": \"~/.bun/bin/bun run $HOOKS_TARGET_DIR/stop.ts\" }]"
+  echo '  }'
+  echo ""
+  echo "To install to a custom path: HOOKS_TARGET_DIR=.claude/hooks bash install.sh --claude-code"
 }
 install_pre_commit() {
   echo "Installing pre-commit hook..."

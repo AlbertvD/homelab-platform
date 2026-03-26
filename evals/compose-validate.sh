@@ -53,8 +53,9 @@ while IFS= read -r file; do
     fi
   done
 
-  # Bind-mount path check
-  BIND_PATHS=$(grep -oP '(?<=- )[^:]+(?=:)' "$file" | grep '^/' || true)
+  # Bind-mount path check: Docker silently creates a directory if the host path doesn't exist.
+  # Captures both absolute paths (/opt/...) and relative paths (./config/..., ../data/...).
+  BIND_PATHS=$(grep -oP '(?<=- )[^:]+(?=:)' "$file" | grep -E '^(/|\./|\.\./)' || true)
   while IFS= read -r host_path; do
     [ -z "$host_path" ] && continue
     if [[ "$host_path" != *"\$"* ]] && [[ "${CI:-}" != "true" ]] && [ ! -e "$host_path" ]; then
