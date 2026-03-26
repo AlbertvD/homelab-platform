@@ -1,0 +1,23 @@
+name: Test Suite
+
+on:
+  workflow_call:
+    inputs:
+      run_unit:
+        type: boolean
+        default: true
+      run_api:
+        type: boolean
+        default: true
+      run_auth:
+        type: boolean
+        default: true
+    secrets:
+      PLATFORM_TOKEN:
+        required: true
+      API_URL:
+        required: false
+      SUPABASE_ANON_KEY:
+        required: false
+      SUPABASE_SERVICE_KEY:
+        required: false
