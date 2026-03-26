@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Unified pre-commit hook
+set -euo pipefail
+EVALS_DIR="$(git rev-parse --show-toplevel)/evals"
+run_eval() { local eval_path="$EVALS_DIR/$1.sh"; if [ -f "$eval_path" ]; then bash "$eval_path" || exit 1; fi; }
+run_eval "destructive-op-check"
+if compgen -G "services/*/docker-compose.yml" >/dev/null 2>&1 || [ -f "docker-compose.yml" ]; then run_eval "compose-validate"; fi
+if compgen -G "supabase/migrations/*.sql" >/dev/null 2>&1; then run_eval "rls-check"; fi
+if [ -n "${OPENBRAIN_KEY:-}" ]; then run_eval "lesson-check"; fi
+echo "All pre-commit checks passed"

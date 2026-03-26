@@ -1,0 +1,52 @@
+name: OpenBrain Lesson Gate
+
+on:
+  workflow_call:
+    secrets:
+      PLATFORM_TOKEN:
+        required: true
+      OPENBRAIN_KEY:
+        required: true
+    vars:
+      OPENBRAIN_URL:
+        required: true
+
+jobs:
+  lesson-check:
+    name: OpenBrain Lesson Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: AlbertvD/homelab-platform
+          path: .platform
+          token: ${{ secrets.PLATFORM_TOKEN }}
+      - name: Query OpenBrain for relevant lessons
+        env:
+          OPENBRAIN_URL: ${{ vars.OPENBRAIN_URL }}
+          OPENBRAIN_KEY: ${{ secrets.OPENBRAIN_KEY }}
+        run: bash .platform/evals/lesson-check.sh
+
+  capture-failure:
+    name: Capture Failure to OpenBrain
+    if: failure()
+    needs: [lesson-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: AlbertvD/homelab-platform
+          path: .platform
+          token: ${{ secrets.PLATFORM_TOKEN }}
+      - name: Capture failure lesson
+        env:
+          OPENBRAIN_URL: ${{ vars.OPENBRAIN_URL }}
+          OPENBRAIN_KEY: ${{ secrets.OPENBRAIN_KEY }}
+        run: |
+          bash .platform/evals/lesson-capture.sh \
+            "ci-pipeline" "ci" "friction" \
+            "CI failed for ${{ github.repository }} on branch ${{ github.ref_name }}"
