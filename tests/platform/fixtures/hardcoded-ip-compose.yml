@@ -1,0 +1,13 @@
+services:
+  myapp:
+    image: myapp:1.2.3
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Amsterdam
+      - DB_HOST=192.168.2.51
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

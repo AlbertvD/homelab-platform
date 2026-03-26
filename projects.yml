@@ -2,8 +2,16 @@ projects:
   homelab-configs:
     repo: AlbertvD/homelab-configs
     type: infrastructure
+    description: "IaC for Proxmox-based homelab"
     evals: [compose-validate, destructive-op-check, lesson-check]
+    tests: [api-contract, auth]
   family-app:
     repo: AlbertvD/family-app
     type: web-app
     evals: [destructive-op-check, lesson-check]
+    tests: [unit, api-contract, auth, e2e]
+  openbrain:
+    repo: AlbertvD/openbrain
+    type: service
+    evals: [destructive-op-check, lesson-check]
+    tests: [unit, api-contract]

@@ -1,0 +1,2 @@
+# IPs used in fixture tests only — not real homelab IPs.
+192.168.2.51

@@ -328,3 +328,85 @@ rules:
     metadata:
       category: reliability
       component: infrastructure
+
+  # ============================================================
+  # Supabase / PostgREST — homelab-specific rules
+  # Derived from real incidents in the homelab project portfolio.
+  # ============================================================
+
+  - id: postgrest-filter-injection
+    # PostgREST .or() and .filter() accept metacharacters (`,`, `(`, `)`) in filter
+    # strings, allowing injection when user input is passed without validation.
+    # Only fires when the filter variable is request-derived — strong signal of
+    # user-controlled input. Variables renamed after assignment are a known blind spot.
+    patterns:
+      - pattern: $CLIENT.from(...).or($FILTER, ...)
+      - pattern-not: $CLIENT.from(...).or("...", ...)
+      - pattern-either:
+          - patterns:
+              - pattern: |
+                  $FILTER = $REQ.query.$X
+                  ...
+                  $CLIENT.from(...).or($FILTER, ...)
+          - patterns:
+              - pattern: |
+                  $FILTER = $REQ.body.$X
+                  ...
+                  $CLIENT.from(...).or($FILTER, ...)
+          - patterns:
+              - pattern: |
+                  $FILTER = $REQ.params.$X
+                  ...
+                  $CLIENT.from(...).or($FILTER, ...)
+    message: >
+      PostgREST .or() with request-derived input — metacharacters allow filter
+      injection. Sanitise or allowlist the input before passing to PostgREST.
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      component: supabase
+
+  - id: open-redirect-next-param
+    # Login pages that redirect to ?next= without an allowlist check are vulnerable
+    # to open redirect attacks. Covers both req.query.next and direct inline forms.
+    pattern-either:
+      - patterns:
+          - pattern: |
+              $NEXT = $REQ.query.next
+              ...
+              res.redirect($NEXT)
+          - pattern-not: |
+              $NEXT = $REQ.query.next
+              ...
+              if (...$NEXT...) { ... }
+              ...
+              res.redirect($NEXT)
+      - patterns:
+          - pattern: res.redirect($REQ.query.next)
+    message: >
+      Unvalidated redirect to ?next= query parameter. Check the value against
+      an allowlist of permitted paths before redirecting.
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      component: supabase
+
+  - id: supabase-grant-all
+    # GRANT ALL overrides selective grants and masks misconfigured RLS because
+    # all privileges are present regardless of what the policy permits.
+    pattern-regex: 'GRANT ALL ON \S+ TO \S+;'
+    message: >
+      GRANT ALL overrides selective grants and can mask RLS misconfiguration.
+      Use specific privileges (SELECT, INSERT, UPDATE, DELETE) instead.
+    languages: [generic]
+    severity: WARNING
+    paths:
+      include:
+        - "*.sql"
+        - "migrations/**"
+        - "supabase/migrations/**"
+    metadata:
+      category: security
+      component: supabase

@@ -36,7 +36,9 @@ check_pattern "^+[[:space:]]*TRUNCATE [a-zA-Z]" "SQL table truncate (bare form) 
 check_pattern "docker system prune -a" "Docker full prune — removes all unused images/volumes"
 check_pattern "docker volume rm" "Docker volume removal — persistent data lost"
 check_pattern "docker volume prune" "Docker volume prune — unused volumes deleted"
-check_pattern "git push.*--force" "Force push — rewrites remote history"
+check_pattern "git push.*(main|master).*--force" "Force push to main/master — rewrites protected branch history"
+# Note: tag force-pushes (git push origin v1 --force) are intentionally allowed —
+# homelab-platform uses a floating v1 tag. Only main/master force-pushes are blocked.
 check_pattern "mkfs\." "Filesystem format — destroys all data on device"
 check_pattern "dd if=.*of=/dev" "Raw disk write — overwrites device data"
 

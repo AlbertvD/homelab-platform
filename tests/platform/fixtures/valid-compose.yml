@@ -1,0 +1,19 @@
+services:
+  myapp:
+    image: myapp:1.2.3
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Amsterdam
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.myapp.rule=Host(`myapp.duin.home`)"
+      - "traefik.http.routers.myapp.entrypoints=websecure"
+      - "traefik.http.routers.myapp.tls.certresolver=stepca"
+      - "traefik.http.services.myapp.loadbalancer.server.port=3000"
+
+networks:
+  proxy:
+    external: true
