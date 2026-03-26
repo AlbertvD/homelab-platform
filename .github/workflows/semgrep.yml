@@ -1,0 +1,344 @@
+# Semgrep Static Analysis — Code security scanning
+# Reusable workflow for CI/CD integration
+#
+# Usage in caller repo:
+#   jobs:
+#     sast:
+#       uses: splinterlabs/code-guardian/.github/workflows/semgrep.yml@main
+
+name: Semgrep SAST
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      config:
+        description: 'Semgrep config (p/default, p/security-audit, p/owasp-top-ten, or path to rules)'
+        required: false
+        type: string
+        default: 'p/default'
+      severity:
+        description: 'Minimum severity to report (INFO, WARNING, ERROR)'
+        required: false
+        type: string
+        default: 'WARNING'
+      fail_on_findings:
+        description: 'Fail workflow if security issues found'
+        required: false
+        type: boolean
+        default: false
+      exclude_paths:
+        description: 'Paths to exclude (comma-separated glob patterns)'
+        required: false
+        type: string
+        default: 'node_modules,vendor,dist,build,.git'
+      scan_changed_only:
+        description: 'Only scan changed files on PRs (faster)'
+        required: false
+        type: boolean
+        default: true
+      extra_rulesets:
+        description: 'Additional rulesets to include (comma-separated)'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      semgrep_app_token:
+        description: 'Optional Semgrep App token for cloud features'
+        required: false
+    outputs:
+      findings_count:
+        description: 'Number of findings at or above severity threshold'
+        value: ${{ jobs.semgrep.outputs.findings_count }}
+
+jobs:
+  semgrep:
+    name: Semgrep Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    outputs:
+      findings_count: ${{ steps.scan.outputs.findings_count }}
+
+    container:
+      image: semgrep/semgrep:1.67.0  # Pin to specific version
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0  # Full history for diff mode
+
+      - name: Build config string
+        id: config
+        shell: bash
+        env:
+          INPUT_CONFIG: ${{ inputs.config }}
+          EXTRA_RULESETS: ${{ inputs.extra_rulesets }}
+          EXCLUDE_PATHS: ${{ inputs.exclude_paths }}
+        run: |
+          CONFIG="$INPUT_CONFIG"
+
+          # Add extra rulesets if specified
+          if [[ -n "$EXTRA_RULESETS" ]]; then
+            IFS=',' read -ra EXTRA <<< "$EXTRA_RULESETS"
+            for ruleset in "${EXTRA[@]}"; do
+              CONFIG="$CONFIG --config $ruleset"
+            done
+          fi
+
+          echo "config=$CONFIG" >> $GITHUB_OUTPUT
+
+          # Build exclude string
+          EXCLUDE=""
+          IFS=',' read -ra PATHS <<< "$EXCLUDE_PATHS"
+          for path in "${PATHS[@]}"; do
+            EXCLUDE="$EXCLUDE --exclude $path"
+          done
+          echo "exclude=$EXCLUDE" >> $GITHUB_OUTPUT
+
+      - name: Determine scan scope
+        id: scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCAN_CHANGED_ONLY: ${{ inputs.scan_changed_only }}
+          BASE_REF: ${{ github.base_ref }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" && "$SCAN_CHANGED_ONLY" == "true" ]]; then
+            # Get changed files for PR
+            git diff --name-only "origin/$BASE_REF...$SHA" > changed_files.txt
+
+            # Filter to supported file types
+            grep -E '\.(py|js|ts|jsx|tsx|go|java|c|cpp|rb|php|scala|kotlin|swift|rust)$' changed_files.txt > scan_files.txt 2>/dev/null || touch scan_files.txt
+
+            if [[ -s scan_files.txt ]]; then
+              echo "mode=changed" >> $GITHUB_OUTPUT
+              echo "target=--include \$(cat scan_files.txt | tr '\n' ' ')" >> $GITHUB_OUTPUT
+              echo "Scanning $(wc -l < scan_files.txt) changed files"
+            else
+              echo "mode=skip" >> $GITHUB_OUTPUT
+              echo "No scannable files changed in this PR"
+            fi
+          else
+            echo "mode=full" >> $GITHUB_OUTPUT
+            echo "target=." >> $GITHUB_OUTPUT
+            echo "Full repository scan"
+          fi
+
+      - name: Run Semgrep
+        id: scan
+        if: steps.scope.outputs.mode != 'skip'
+        shell: bash
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.semgrep_app_token }}
+          INPUT_CONFIG: ${{ inputs.config }}
+          INPUT_SEVERITY: ${{ inputs.severity }}
+          EXTRA_RULESETS: ${{ inputs.extra_rulesets }}
+          EXCLUDE_OPTS: ${{ steps.config.outputs.exclude }}
+          SCAN_MODE: ${{ steps.scope.outputs.mode }}
+        run: |
+          mkdir -p results
+
+          echo "=== Semgrep Configuration ==="
+          echo "Config: $INPUT_CONFIG"
+          echo "Severity: $INPUT_SEVERITY"
+          echo "Mode: $SCAN_MODE"
+          echo ""
+
+          # Validate inputs contain only safe characters
+          for var in "$INPUT_CONFIG" "$INPUT_SEVERITY"; do
+            if [[ "$var" =~ [^a-zA-Z0-9_./:,\ -] ]]; then
+              echo "::error::Input contains unsafe characters: $var"
+              exit 1
+            fi
+          done
+
+          # Build command args as array (no eval)
+          ARGS=(semgrep scan
+            --config "$INPUT_CONFIG"
+            --severity "$INPUT_SEVERITY"
+            --json --json-output results/semgrep.json
+            --sarif --sarif-output results/semgrep.sarif
+            --text --text-output results/semgrep.txt
+            --metrics=off
+          )
+
+          # Add exclude options (already validated by prior step)
+          if [[ -n "$EXCLUDE_OPTS" ]]; then
+            read -ra EXCL <<< "$EXCLUDE_OPTS"
+            ARGS+=("${EXCL[@]}")
+          fi
+
+          # Add extra rulesets with validation
+          if [[ -n "$EXTRA_RULESETS" ]]; then
+            IFS=',' read -ra EXTRA <<< "$EXTRA_RULESETS"
+            for ruleset in "${EXTRA[@]}"; do
+              if [[ "$ruleset" =~ ^[a-zA-Z0-9/_.-]+$ ]]; then
+                ARGS+=(--config "$ruleset")
+              else
+                echo "::warning::Skipping invalid ruleset: $ruleset"
+              fi
+            done
+          fi
+
+          echo "=== Starting Scan ==="
+          set +e
+          "${ARGS[@]}" .
+          SCAN_EXIT=$?
+          set -e
+
+          # Count findings
+          if [[ -f results/semgrep.json ]]; then
+            FINDINGS=$(jq '.results | length' results/semgrep.json 2>/dev/null || echo "0")
+          else
+            FINDINGS=0
+          fi
+
+          echo "findings_count=$FINDINGS" >> $GITHUB_OUTPUT
+          echo ""
+          echo "=== Scan Complete ==="
+          echo "Findings: $FINDINGS"
+
+          # Show summary
+          if [[ "$FINDINGS" -gt 0 && -f results/semgrep.json ]]; then
+            echo ""
+            echo "=== Findings by Rule ==="
+            jq -r '.results | group_by(.check_id) | .[] | "\(length) x \(.[0].check_id)"' results/semgrep.json 2>/dev/null | sort -rn || true
+          fi
+
+      - name: Generate summary
+        if: always() && steps.scope.outputs.mode != 'skip'
+        shell: bash
+        run: |
+          if [[ -f results/semgrep.json ]]; then
+            echo "## Semgrep Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            FINDINGS=$(jq '.results | length' results/semgrep.json)
+
+            if [[ "$FINDINGS" -eq 0 ]]; then
+              echo ":white_check_mark: No security issues found" >> $GITHUB_STEP_SUMMARY
+            else
+              echo ":warning: Found **$FINDINGS** issue(s)" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+
+              # Summary table by severity
+              echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+              echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+              for sev in ERROR WARNING INFO; do
+                COUNT=$(jq --arg s "$sev" '[.results[] | select(.extra.severity == $s)] | length' results/semgrep.json)
+                echo "| $sev | $COUNT |" >> $GITHUB_STEP_SUMMARY
+              done
+
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "<details>" >> $GITHUB_STEP_SUMMARY
+              echo "<summary>View findings</summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+
+              jq -r '.results[:20][] | "- **\(.extra.severity)**: \(.check_id) in `\(.path):\(.start.line)`"' results/semgrep.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+
+              TOTAL=$(jq '.results | length' results/semgrep.json)
+              if [[ "$TOTAL" -gt 20 ]]; then
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "... and $((TOTAL - 20)) more findings" >> $GITHUB_STEP_SUMMARY
+              fi
+
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+      - name: Upload results
+        if: always() && steps.scope.outputs.mode != 'skip'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-results
+          path: results/
+          retention-days: 30
+
+      - name: Upload SARIF to GitHub Security
+        if: always() && hashFiles('results/semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@480db559a14342288b67e54bd959dd52dc3ee68f # v3
+        with:
+          sarif_file: results/semgrep.sarif
+          category: semgrep-sast
+        continue-on-error: true
+
+      - name: Fail on findings
+        if: inputs.fail_on_findings && steps.scan.outputs.findings_count > 0
+        shell: bash
+        env:
+          FINDINGS_COUNT: ${{ steps.scan.outputs.findings_count }}
+        run: |
+          echo "::error::Semgrep found $FINDINGS_COUNT security issue(s)"
+          echo ""
+          echo "Review the semgrep-results artifact for details."
+          echo "To bypass, set fail_on_findings: false in your workflow."
+          exit 1
+
+  # PR comment with findings
+  pr-comment:
+    name: PR Comment
+    needs: semgrep
+    if: github.event_name == 'pull_request' && needs.semgrep.outputs.findings_count > 0
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Download results
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: semgrep-results
+          path: results
+
+      - name: Comment on PR
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const fs = require('fs');
+            let data = {};
+            try {
+              data = JSON.parse(fs.readFileSync('results/semgrep.json', 'utf8'));
+            } catch (e) {
+              console.log('Could not parse results');
+              return;
+            }
+
+            const findings = data.results || [];
+            const bySeverity = findings.reduce((acc, f) => {
+              const sev = f.extra?.severity || 'UNKNOWN';
+              acc[sev] = (acc[sev] || 0) + 1;
+              return acc;
+            }, {});
+
+            const body = `## :mag: Semgrep Security Analysis
+
+            **Found ${findings.length} issue(s) in this PR**
+
+            | Severity | Count |
+            |----------|-------|
+            | ERROR | ${bySeverity.ERROR || 0} |
+            | WARNING | ${bySeverity.WARNING || 0} |
+            | INFO | ${bySeverity.INFO || 0} |
+
+            <details>
+            <summary>View findings</summary>
+
+            ${findings.slice(0, 15).map(f => `- **[${f.extra?.severity || 'UNKNOWN'}]** \`${f.check_id}\` in \`${f.path}:${f.start?.line}\``).join('\n')}
+            ${findings.length > 15 ? `\n... and ${findings.length - 15} more` : ''}
+
+            </details>
+
+            > Download the \`semgrep-results\` artifact for the full report.
+            >
+            > To suppress a finding, add \`# nosemgrep: rule-id\` inline.`;
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });

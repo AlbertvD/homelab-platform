@@ -1,0 +1,139 @@
+name: Safety Evals
+
+on:
+  workflow_call:
+    inputs:
+      run_compose_validate:
+        description: "Run compose file validation"
+        type: boolean
+        default: false
+    secrets:
+      PLATFORM_TOKEN:
+        required: true
+      OPENBRAIN_KEY:
+        required: false
+    vars:
+      OPENBRAIN_URL:
+        required: false
+
+jobs:
+  resolve-platform:
+    name: Resolve Platform SHA
+    runs-on: ubuntu-latest
+    outputs:
+      platform_sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - name: Get platform HEAD SHA
+        id: sha
+        run: |
+          SHA=$(git ls-remote https://x-access-token:${{ secrets.PLATFORM_TOKEN }}@github.com/AlbertvD/homelab-platform.git HEAD | cut -f1)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+  destructive-check:
+    name: Destructive Op Check
+    needs: resolve-platform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/cache@v4
+        id: platform-cache
+        with:
+          path: .platform
+          key: platform-${{ needs.resolve-platform.outputs.platform_sha }}
+      - uses: actions/checkout@v4
+        if: steps.platform-cache.outputs.cache-hit != 'true'
+        with:
+          repository: AlbertvD/homelab-platform
+          path: .platform
+          token: ${{ secrets.PLATFORM_TOKEN }}
+      - name: Run destructive operation check
+        run: bash .platform/evals/destructive-op-check.sh
+
+  compose-validate:
+    name: Compose Validate
+    if: ${{ inputs.run_compose_validate }}
+    needs: resolve-platform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/cache@v4
+        id: platform-cache
+        with:
+          path: .platform
+          key: platform-${{ needs.resolve-platform.outputs.platform_sha }}
+      - uses: actions/checkout@v4
+        if: steps.platform-cache.outputs.cache-hit != 'true'
+        with:
+          repository: AlbertvD/homelab-platform
+          path: .platform
+          token: ${{ secrets.PLATFORM_TOKEN }}
+      - name: Run compose validation
+        run: bash .platform/evals/compose-validate.sh
+
+  gitleaks:
+    name: Secret Detection
+    uses: AlbertvD/homelab-platform/.github/workflows/gitleaks.yml@v1
+    secrets:
+      PLATFORM_TOKEN: ${{ secrets.PLATFORM_TOKEN }}
+
+  semgrep:
+    name: SAST
+    uses: AlbertvD/homelab-platform/.github/workflows/semgrep.yml@v1
+    secrets:
+      PLATFORM_TOKEN: ${{ secrets.PLATFORM_TOKEN }}
+
+  lesson-check:
+    name: OpenBrain Lesson Check
+    needs: resolve-platform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/cache@v4
+        id: platform-cache
+        with:
+          path: .platform
+          key: platform-${{ needs.resolve-platform.outputs.platform_sha }}
+      - uses: actions/checkout@v4
+        if: steps.platform-cache.outputs.cache-hit != 'true'
+        with:
+          repository: AlbertvD/homelab-platform
+          path: .platform
+          token: ${{ secrets.PLATFORM_TOKEN }}
+      - name: Query OpenBrain for relevant lessons
+        env:
+          OPENBRAIN_URL: ${{ vars.OPENBRAIN_URL }}
+          OPENBRAIN_KEY: ${{ secrets.OPENBRAIN_KEY }}
+        run: bash .platform/evals/lesson-check.sh
+
+  capture-failure:
+    name: Capture Failure to OpenBrain
+    if: failure()
+    needs: [resolve-platform, destructive-check, compose-validate, gitleaks, semgrep, lesson-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        id: platform-cache
+        with:
+          path: .platform
+          key: platform-${{ needs.resolve-platform.outputs.platform_sha }}
+      - uses: actions/checkout@v4
+        if: steps.platform-cache.outputs.cache-hit != 'true'
+        with:
+          repository: AlbertvD/homelab-platform
+          path: .platform
+          token: ${{ secrets.PLATFORM_TOKEN }}
+      - name: Capture failure lesson
+        env:
+          OPENBRAIN_URL: ${{ vars.OPENBRAIN_URL }}
+          OPENBRAIN_KEY: ${{ secrets.OPENBRAIN_KEY }}
+        run: |
+          bash .platform/evals/lesson-capture.sh \
+            "ci-pipeline" "ci" "friction" \
+            "Safety eval failed for ${{ github.repository }} on branch ${{ github.ref_name }}"

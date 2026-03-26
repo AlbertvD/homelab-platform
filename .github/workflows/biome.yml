@@ -1,0 +1,40 @@
+name: Biome Lint
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      biome-version:
+        description: 'Biome version to use'
+        required: false
+        type: string
+        default: 'latest'
+      paths:
+        description: 'Paths to lint (space-separated)'
+        required: false
+        type: string
+        default: '.'
+
+jobs:
+  biome:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Biome
+        uses: biomejs/setup-biome@a05c02a1304287da45f13648675a70d5841acdbc # v2
+        with:
+          version: ${{ inputs.biome-version }}
+
+      - name: Run Biome
+        env:
+          PATHS: ${{ inputs.paths }}
+        run: |
+          # Validate paths contain only safe characters
+          if [[ "$PATHS" =~ [^a-zA-Z0-9_./ -] ]]; then
+            echo "::error::Invalid characters in paths input"
+            exit 1
+          fi
+          biome ci $PATHS
