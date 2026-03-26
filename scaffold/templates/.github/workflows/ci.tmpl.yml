@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  safety:
+    uses: AlbertvD/homelab-platform/.github/workflows/safety.yml@v1
+    with:
+      run_compose_validate: true
+    secrets: inherit
+
+  test:
+    needs: safety
+    uses: AlbertvD/homelab-platform/.github/workflows/test.yml@v1
+    with:
+      run_unit: true
+      run_api: true
+      run_auth: true
+      run_e2e: false
+    secrets: inherit
+
+  build:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    uses: AlbertvD/homelab-platform/.github/workflows/build-push.yml@v1
+    with:
+      context: .
+      dockerfile: ./Dockerfile
+      image_name: {{PROJECT_NAME}}
+      registry: ghcr.io/albertvd/homelab-configs
+      required_build_args: "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      build_args: |
+        NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+    secrets: inherit

@@ -1,0 +1,23 @@
+services:
+  {{SERVICE_NAME}}:
+    image: ghcr.io/albertvd/homelab-configs/{{SERVICE_NAME}}:latest
+    container_name: {{SERVICE_NAME}}
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - TZ=Europe/Amsterdam
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.{{SERVICE_NAME}}.rule=Host(`{{SERVICE_NAME}}.duin.home`)"
+      - "traefik.http.routers.{{SERVICE_NAME}}.entrypoints=websecure"
+      - "traefik.http.routers.{{SERVICE_NAME}}.tls.certresolver=stepca"
+      - "traefik.http.services.{{SERVICE_NAME}}.loadbalancer.server.port={{PORT}}"
+
+networks:
+  proxy:
+    external: true

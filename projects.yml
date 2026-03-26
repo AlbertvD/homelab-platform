@@ -1,0 +1,9 @@
+projects:
+  homelab-configs:
+    repo: AlbertvD/homelab-configs
+    type: infrastructure
+    evals: [compose-validate, destructive-op-check, lesson-check]
+  family-app:
+    repo: AlbertvD/family-app
+    type: web-app
+    evals: [destructive-op-check, lesson-check]

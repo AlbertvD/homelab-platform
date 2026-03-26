@@ -1,0 +1,22 @@
+# CLAUDE.md — {{PROJECT_NAME}}
+
+## Project Overview
+{{PROJECT_NAME}} is a full-stack web application deployed to the Duin Home homelab.
+
+**Stack:** Next.js (frontend) + Express/Prisma (backend) + Supabase (auth) + Docker + Traefik
+
+**URL:** https://{{PROJECT_NAME}}.duin.home
+
+## Architecture
+- **Frontend**: Next.js + Mantine UI + Zustand state management
+- **Backend**: Express.js + Prisma ORM + Zod validation
+- **Auth**: Supabase (JWT in httpOnly cookies)
+- **Deploy**: Docker Compose via Portainer GitOps (push to main = deploy)
+
+## Key Constraints
+- **Never hardcode IPs** — use DNS names (*.duin.home)
+- **Never restart containers directly** — push to main, Portainer auto-deploys
+- **Always run `make check` before pushing**
+- **All API inputs validated with Zod**
+- **Prisma only** — no raw SQL
+- **Tests target staging Supabase only** — never production
