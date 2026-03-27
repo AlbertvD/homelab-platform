@@ -85,6 +85,7 @@ jobs:
     uses: AlbertvD/homelab-platform/.github/workflows/semgrep.yml@v1
     secrets:
       PLATFORM_TOKEN: ${{ secrets.PLATFORM_TOKEN }}
+      semgrep_app_token: ${{ secrets.SEMGREP_APP_TOKEN }}
 
   lesson-check:
     name: OpenBrain Lesson Check

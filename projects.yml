@@ -1,17 +1,44 @@
+# Project Registry — catalogue of all homelab projects and their platform feature usage.
+# NOTE: lesson-check.sh does NOT read this file — it extracts stack names directly from
+# changed file paths. This registry is documentation/tooling metadata only.
+
 projects:
   homelab-configs:
     repo: AlbertvD/homelab-configs
     type: infrastructure
-    description: "IaC for Proxmox-based homelab"
+    description: "IaC for Proxmox-based homelab. Services deployed via Portainer stacks."
+    stack: homelab-configs
     evals: [compose-validate, destructive-op-check, lesson-check]
     tests: [api-contract, auth]
-  family-app:
-    repo: AlbertvD/family-app
+    services: [traefik, portainer, prometheus, grafana, jellyfin, nextcloud, immich, homepage]
+    security: [secret-scanning, sast, dependency-audit]
+
+  family-hub:
+    repo: AlbertvD/homelab-configs (Indonesian app subdirectory)
     type: web-app
+    description: "Family coordination app with Workbox PWA, Supabase auth, profile management."
+    stack: family-hub
     evals: [destructive-op-check, lesson-check]
     tests: [unit, api-contract, auth, e2e]
+    services: [frontend, backend, supabase]
+    security: [secret-scanning, sast, dependency-audit]
+
   openbrain:
-    repo: AlbertvD/openbrain
+    repo: AlbertvD/homelab-configs (openbrain subdirectory)
     type: service
-    evals: [destructive-op-check, lesson-check]
+    description: "OpenBrain MCP — institutional memory layer. Supabase PostgreSQL with 38 tools."
+    stack: openbrain
+    evals: [destructive-op-check, lesson-check, rls-check]
     tests: [unit, api-contract]
+    services: [openbrain-api, supabase]
+    security: [secret-scanning, sast, dependency-audit, rls-policies]
+
+  homelab-platform:
+    repo: AlbertvD/homelab-platform
+    type: platform
+    description: "Shared tooling repository. Reusable CI workflows, evals, hooks, testing framework, project scaffold."
+    stack: homelab-platform
+    evals: [destructive-op-check]
+    tests: [platform-evals, semgrep, gitleaks, dependency-audit]
+    services: []
+    security: [sast, secret-scanning, dependency-audit, semgrep-homelab-rules]

@@ -43,6 +43,9 @@ on:
         type: string
         default: ''
     secrets:
+      PLATFORM_TOKEN:
+        description: 'Token to access homelab-platform private repo'
+        required: false
       semgrep_app_token:
         description: 'Optional Semgrep App token for cloud features'
         required: false
@@ -69,6 +72,14 @@ jobs:
         with:
           fetch-depth: 0  # Full history for diff mode
 
+      - name: Checkout homelab-platform for bundled rules
+        if: secrets.PLATFORM_TOKEN != ''
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: AlbertvD/homelab-platform
+          path: .platform
+          token: ${{ secrets.PLATFORM_TOKEN }}
+
       - name: Build config string
         id: config
         shell: bash
@@ -76,8 +87,14 @@ jobs:
           INPUT_CONFIG: ${{ inputs.config }}
           EXTRA_RULESETS: ${{ inputs.extra_rulesets }}
           EXCLUDE_PATHS: ${{ inputs.exclude_paths }}
+          PLATFORM_TOKEN: ${{ secrets.PLATFORM_TOKEN }}
         run: |
           CONFIG="$INPUT_CONFIG"
+
+          # Add bundled homelab rules if platform was checked out
+          if [[ -d ".platform/.semgrep" && -n "$PLATFORM_TOKEN" ]]; then
+            CONFIG="$CONFIG --config .platform/.semgrep/homelab-rules.yml"
+          fi
 
           # Add extra rulesets if specified
           if [[ -n "$EXTRA_RULESETS" ]]; then
