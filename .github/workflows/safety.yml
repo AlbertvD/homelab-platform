@@ -12,9 +12,8 @@ on:
         required: true
       OPENBRAIN_KEY:
         required: false
-    vars:
-      OPENBRAIN_URL:
-        required: false
+    # Note: OPENBRAIN_URL is accessed via vars.OPENBRAIN_URL in job steps.
+    # workflow_call does not support a vars: block — variables pass through automatically.
 
 jobs:
   resolve-platform:
