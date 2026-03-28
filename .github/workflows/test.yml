@@ -1,4 +1,4 @@
-name: Test Suite # v1
+name: Test Suite
 
 on:
   workflow_call:
@@ -32,7 +32,6 @@ on:
       SUPABASE_SERVICE_KEY:
         required: false
       OPENBRAIN_KEY:
-        # Used by capture-failure job. Optional — lesson capture degrades gracefully if absent.
         required: false
 
 jobs:
