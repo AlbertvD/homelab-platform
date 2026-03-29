@@ -73,8 +73,8 @@ jobs:
           fetch-depth: 0  # Full history for diff mode
 
       - name: Checkout homelab-platform for bundled rules
-        if: secrets.PLATFORM_TOKEN != ''
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        continue-on-error: true
         with:
           repository: AlbertvD/homelab-platform
           path: .platform

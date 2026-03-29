@@ -7,9 +7,6 @@ on:
         required: true
       OPENBRAIN_KEY:
         required: true
-    vars:
-      OPENBRAIN_URL:
-        required: true
 
 jobs:
   lesson-check:
