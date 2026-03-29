@@ -35,9 +35,6 @@ on:
         description: "Comma-separated list of build arg names that must be non-empty"
         type: string
         default: ""
-    secrets:
-      GITHUB_TOKEN:
-        required: false
 
 jobs:
   build:
