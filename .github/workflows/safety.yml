@@ -76,14 +76,10 @@ jobs:
   gitleaks:
     name: Secret Detection
     uses: AlbertvD/homelab-platform/.github/workflows/gitleaks.yml@v1
-    permissions:
-      pull-requests: write
 
   semgrep:
     name: SAST
     uses: AlbertvD/homelab-platform/.github/workflows/semgrep.yml@v1
-    permissions:
-      pull-requests: write
     secrets:
       PLATFORM_TOKEN: ${{ secrets.PLATFORM_TOKEN }}
       semgrep_app_token: ${{ secrets.SEMGREP_APP_TOKEN }}
