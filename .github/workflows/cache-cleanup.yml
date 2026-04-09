@@ -1,0 +1,68 @@
+# Cache Cleanup — Prune stale GitHub Actions caches
+# Reusable workflow: deletes caches from deleted branches and caches older than 7 days.
+#
+# Usage in caller repo:
+#   jobs:
+#     cleanup:
+#       uses: AlbertvD/homelab-platform/.github/workflows/cache-cleanup.yml@v1
+
+name: Cache Cleanup
+
+on:
+  workflow_call:
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    name: Prune stale caches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete stale caches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Cleaning caches for $REPO"
+
+          # Get active branch names
+          ACTIVE_BRANCHES=$(gh api "repos/$REPO/branches" --paginate --jq '.[].name' | sort)
+
+          # Fetch all caches and process each one
+          gh api "repos/$REPO/actions/caches" --paginate --jq '.actions_caches[] | {id: .id, ref: .ref, created_at: .created_at}' | \
+          jq -rc '.' | while IFS= read -r cache; do
+            CACHE_ID=$(echo "$cache" | jq -r '.id')
+            CACHE_REF=$(echo "$cache" | jq -r '.ref')
+            CREATED_AT=$(echo "$cache" | jq -r '.created_at')
+
+            SHOULD_DELETE=false
+
+            # Delete if branch-based cache and branch no longer exists
+            if [[ "$CACHE_REF" == refs/heads/* ]]; then
+              BRANCH="${CACHE_REF#refs/heads/}"
+              if ! echo "$ACTIVE_BRANCHES" | grep -qx "$BRANCH"; then
+                echo "Deleting cache $CACHE_ID: branch '$BRANCH' no longer exists"
+                SHOULD_DELETE=true
+              fi
+            fi
+
+            # Delete if older than 7 days (604800 seconds)
+            if [[ "$SHOULD_DELETE" == "false" ]]; then
+              CREATED_TS=$(date -d "$CREATED_AT" +%s 2>/dev/null || echo 0)
+              NOW_TS=$(date +%s)
+              AGE=$(( NOW_TS - CREATED_TS ))
+              if [[ $AGE -gt 604800 ]]; then
+                echo "Deleting cache $CACHE_ID: age $((AGE / 86400)) days (>7)"
+                SHOULD_DELETE=true
+              fi
+            fi
+
+            if [[ "$SHOULD_DELETE" == "true" ]]; then
+              gh api --method DELETE "repos/$REPO/actions/caches/$CACHE_ID" \
+                && echo "  Deleted $CACHE_ID" \
+                || echo "  Failed to delete $CACHE_ID (may already be gone)"
+            fi
+          done
+
+          echo "Done."
