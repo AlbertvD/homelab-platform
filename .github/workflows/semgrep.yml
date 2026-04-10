@@ -125,7 +125,8 @@ jobs:
         run: |
           if [[ "$EVENT_NAME" == "pull_request" && "$SCAN_CHANGED_ONLY" == "true" ]]; then
             # Get changed files for PR
-            git diff --name-only "origin/$BASE_REF...$SHA" > changed_files.txt
+            MERGE_BASE=$(git merge-base "origin/$BASE_REF" "$SHA")
+            git diff --name-only "$MERGE_BASE" "$SHA" > changed_files.txt
 
             # Filter to supported file types
             grep -E '\.(py|js|ts|jsx|tsx|go|java|c|cpp|rb|php|scala|kotlin|swift|rust)$' changed_files.txt > scan_files.txt 2>/dev/null || touch scan_files.txt
