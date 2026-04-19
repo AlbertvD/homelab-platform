@@ -114,6 +114,17 @@ jobs:
           done
           echo "exclude=$EXCLUDE" >> $GITHUB_OUTPUT
 
+      - name: Trust workspace paths inside Semgrep container
+        # The Semgrep container runs as a different user than the host-mounted
+        # workspace owner, so git refuses to operate on the checkout paths
+        # unless they're explicitly whitelisted. actions/checkout adds this for
+        # the second (.platform) checkout but not reliably for the primary
+        # workspace inside a container context.
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/.platform"
+
       - name: Determine scan scope
         id: scope
         shell: bash
