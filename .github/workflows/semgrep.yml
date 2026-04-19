@@ -60,6 +60,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    permissions:
+      contents: read
+      # security-events: write is required by github/codeql-action/upload-sarif
+      # so Semgrep findings surface in the repo's Security tab. Without this,
+      # the upload step silently fails with "Input required and not supplied: token".
+      security-events: write
+
     outputs:
       findings_count: ${{ steps.scan.outputs.findings_count }}
 

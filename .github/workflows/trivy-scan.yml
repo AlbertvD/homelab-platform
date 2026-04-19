@@ -131,11 +131,26 @@ jobs:
     if: needs.detect-images.outputs.has_images == 'true'
     runs-on: ubuntu-latest
     continue-on-error: ${{ !inputs.fail_on_vulnerabilities }}
+    permissions:
+      contents: read
+      packages: read
     strategy:
       fail-fast: false
       matrix:
         image: ${{ fromJson(needs.detect-images.outputs.images) }}
     steps:
+      - name: Log in to ghcr.io for private images
+        # Required for Trivy to pull private images from GitHub Container Registry.
+        # Skipped for non-ghcr.io images. continue-on-error keeps public-image
+        # scans working even if the caller workflow hasn't granted packages:read.
+        if: startsWith(matrix.image, 'ghcr.io/')
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
       - name: Run Trivy image scan
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.69.3 - pinned due to supply chain compromise in v0.69.4
         with:
