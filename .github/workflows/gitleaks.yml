@@ -32,6 +32,11 @@ on:
         required: false
         type: string
         default: ''
+      runner:
+        description: 'Runner label (e.g., ubuntu-latest or self-hosted)'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
     outputs:
       findings_count:
         description: 'Number of potential secrets found'
@@ -40,7 +45,7 @@ on:
 jobs:
   gitleaks:
     name: Secret Detection
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 10
 
     outputs:

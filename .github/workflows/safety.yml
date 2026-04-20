@@ -7,6 +7,11 @@ on:
         description: "Run compose file validation"
         type: boolean
         default: false
+      runner:
+        description: 'Runner label (e.g., ubuntu-latest or self-hosted)'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
     secrets:
       PLATFORM_TOKEN:
         required: true
@@ -18,7 +23,7 @@ on:
 jobs:
   resolve-platform:
     name: Resolve Platform SHA
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     outputs:
       platform_sha: ${{ steps.sha.outputs.sha }}
     steps:
@@ -31,7 +36,7 @@ jobs:
   destructive-check:
     name: Destructive Op Check
     needs: resolve-platform
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,7 +59,7 @@ jobs:
     name: Compose Validate
     if: ${{ inputs.run_compose_validate }}
     needs: resolve-platform
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,10 +81,14 @@ jobs:
   gitleaks:
     name: Secret Detection
     uses: AlbertvD/homelab-platform/.github/workflows/gitleaks.yml@v1
+    with:
+      runner: ${{ inputs.runner }}
 
   semgrep:
     name: SAST
     uses: AlbertvD/homelab-platform/.github/workflows/semgrep.yml@v1
+    with:
+      runner: ${{ inputs.runner }}
     secrets:
       PLATFORM_TOKEN: ${{ secrets.PLATFORM_TOKEN }}
       semgrep_app_token: ${{ secrets.SEMGREP_APP_TOKEN }}
@@ -87,7 +96,7 @@ jobs:
   lesson-check:
     name: OpenBrain Lesson Check
     needs: resolve-platform
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -113,7 +122,7 @@ jobs:
     name: Capture Failure to OpenBrain
     if: failure()
     needs: [resolve-platform, destructive-check, compose-validate, gitleaks, semgrep, lesson-check]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
