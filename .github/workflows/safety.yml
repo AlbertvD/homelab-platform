@@ -23,7 +23,7 @@ on:
 jobs:
   resolve-platform:
     name: Resolve Platform SHA
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     outputs:
       platform_sha: ${{ steps.sha.outputs.sha }}
     steps:
@@ -36,7 +36,7 @@ jobs:
   destructive-check:
     name: Destructive Op Check
     needs: resolve-platform
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,7 +59,7 @@ jobs:
     name: Compose Validate
     if: ${{ inputs.run_compose_validate }}
     needs: resolve-platform
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -96,7 +96,7 @@ jobs:
   lesson-check:
     name: OpenBrain Lesson Check
     needs: resolve-platform
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -122,7 +122,7 @@ jobs:
     name: Capture Failure to OpenBrain
     if: failure()
     needs: [resolve-platform, destructive-check, compose-validate, gitleaks, semgrep, lesson-check]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4

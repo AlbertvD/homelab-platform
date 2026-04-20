@@ -45,7 +45,7 @@ on:
 
 jobs:
   detect-images:
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     outputs:
       images: ${{ steps.find.outputs.images }}
       has_images: ${{ steps.find.outputs.has_images }}
@@ -98,7 +98,7 @@ jobs:
   scan-dockerfiles:
     needs: detect-images
     if: needs.detect-images.outputs.has_dockerfiles == 'true'
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 45
     continue-on-error: ${{ !inputs.fail_on_vulnerabilities }}
     strategy:
@@ -137,7 +137,7 @@ jobs:
   scan-images:
     needs: detect-images
     if: needs.detect-images.outputs.has_images == 'true'
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 45
     continue-on-error: ${{ !inputs.fail_on_vulnerabilities }}
     permissions:
@@ -188,7 +188,7 @@ jobs:
   summary:
     needs: [detect-images, scan-dockerfiles, scan-images]
     if: always()
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - name: Scan Summary
         env:

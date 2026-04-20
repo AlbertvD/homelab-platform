@@ -45,7 +45,7 @@ on:
 jobs:
   gitleaks:
     name: Secret Detection
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 10
 
     outputs:

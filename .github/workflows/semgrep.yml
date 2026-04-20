@@ -62,7 +62,7 @@ on:
 jobs:
   semgrep:
     name: Semgrep Analysis
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 20
 
     permissions:
