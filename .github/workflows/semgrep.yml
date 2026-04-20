@@ -42,6 +42,11 @@ on:
         required: false
         type: string
         default: ''
+      runner:
+        description: 'Runner label (e.g., ubuntu-latest or self-hosted)'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
     secrets:
       PLATFORM_TOKEN:
         description: 'Token to access homelab-platform private repo'
@@ -57,7 +62,7 @@ on:
 jobs:
   semgrep:
     name: Semgrep Analysis
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 20
 
     permissions:

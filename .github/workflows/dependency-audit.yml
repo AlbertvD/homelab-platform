@@ -18,6 +18,11 @@ on:
         required: false
         default: ''
         type: string
+      runner:
+        description: 'Runner label (e.g., ubuntu-latest or self-hosted)'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
   # Allow direct triggering for testing
   workflow_dispatch:
     inputs:
@@ -29,7 +34,8 @@ on:
 
 jobs:
   detect-package-managers:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
     outputs:
       has_npm: ${{ steps.detect.outputs.has_npm }}
       has_pip: ${{ steps.detect.outputs.has_pip }}
@@ -58,7 +64,8 @@ jobs:
   npm-audit:
     needs: detect-package-managers
     if: needs.detect-package-managers.outputs.has_npm == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
     continue-on-error: ${{ !inputs.fail_on_vulnerabilities }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -127,7 +134,8 @@ jobs:
   pip-audit:
     needs: detect-package-managers
     if: needs.detect-package-managers.outputs.has_pip == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
     continue-on-error: ${{ !inputs.fail_on_vulnerabilities }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -221,7 +229,8 @@ jobs:
   summary:
     needs: [detect-package-managers, npm-audit, pip-audit]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
     steps:
       - name: Audit Summary
         env:

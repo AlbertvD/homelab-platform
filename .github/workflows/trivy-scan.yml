@@ -26,6 +26,11 @@ on:
         required: false
         default: true
         type: boolean
+      runner:
+        description: 'Runner label (e.g., ubuntu-latest or self-hosted)'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
   workflow_dispatch:
     inputs:
       image:
@@ -40,7 +45,7 @@ on:
 
 jobs:
   detect-images:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     outputs:
       images: ${{ steps.find.outputs.images }}
       has_images: ${{ steps.find.outputs.has_images }}
@@ -93,7 +98,8 @@ jobs:
   scan-dockerfiles:
     needs: detect-images
     if: needs.detect-images.outputs.has_dockerfiles == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 45
     continue-on-error: ${{ !inputs.fail_on_vulnerabilities }}
     strategy:
       fail-fast: false
@@ -104,6 +110,8 @@ jobs:
 
       - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.69.3 - pinned due to supply chain compromise in v0.69.4
+        env:
+          TRIVY_CACHE_DIR: /runner/_work/_tool/trivy-cache
         with:
           scan-type: 'fs'
           scan-ref: ${{ matrix.dockerfile }}
@@ -129,7 +137,8 @@ jobs:
   scan-images:
     needs: detect-images
     if: needs.detect-images.outputs.has_images == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 45
     continue-on-error: ${{ !inputs.fail_on_vulnerabilities }}
     permissions:
       contents: read
@@ -153,6 +162,8 @@ jobs:
 
       - name: Run Trivy image scan
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.69.3 - pinned due to supply chain compromise in v0.69.4
+        env:
+          TRIVY_CACHE_DIR: /runner/_work/_tool/trivy-cache
         with:
           image-ref: ${{ matrix.image }}
           severity: ${{ inputs.severity }}
@@ -177,7 +188,7 @@ jobs:
   summary:
     needs: [detect-images, scan-dockerfiles, scan-images]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     steps:
       - name: Scan Summary
         env:
