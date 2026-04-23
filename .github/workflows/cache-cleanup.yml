@@ -10,6 +10,12 @@ name: Cache Cleanup
 
 on:
   workflow_call:
+    inputs:
+      runner:
+        description: 'Runner label (e.g., ubuntu-latest or self-hosted)'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
 
 permissions:
   actions: write
@@ -17,7 +23,7 @@ permissions:
 jobs:
   cleanup:
     name: Prune stale caches
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - name: Delete stale caches
         env:

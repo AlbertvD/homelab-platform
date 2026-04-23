@@ -21,6 +21,11 @@ on:
       node_version:
         type: string
         default: "20"
+      runner:
+        description: 'Runner label (e.g., ubuntu-latest or self-hosted)'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
     secrets:
       PLATFORM_TOKEN:
         required: true
@@ -36,6 +41,6 @@ on:
 jobs:
   placeholder:
     name: Tests (all layers disabled)
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - run: echo "All test layers disabled. Enable by flipping run_unit/run_api/run_auth in ci.yml once staging credentials are added."
