@@ -42,6 +42,15 @@ on:
         required: false
         type: string
         default: ''
+      exclude_images:
+        description: >
+          Space-separated list of image refs to exclude from scanning (e.g.
+          cross-repo GHCR images the calling repo's GITHUB_TOKEN cannot pull).
+          Images are already scanned by their own repo's CI — excluding them
+          here prevents DENIED manifest-fetch failures.
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       image:
@@ -70,6 +79,7 @@ jobs:
         env:
           INPUT_IMAGE: ${{ inputs.image }}
           CHANGED_SERVICES: ${{ inputs.changed_services }}
+          EXCLUDE_IMAGES: ${{ inputs.exclude_images }}
         run: |
           # If explicit image provided, use that
           if [ -n "$INPUT_IMAGE" ]; then
@@ -132,6 +142,12 @@ jobs:
             grep -v '\${' | \
             sort -u | \
             head -20 || true)
+
+          # Filter out excluded images (cross-repo images this token cannot pull)
+          if [ -n "$EXCLUDE_IMAGES" ]; then
+            EXCLUDE_PATTERN=$(echo "$EXCLUDE_IMAGES" | tr ' ' '\n' | grep -v '^$' | paste -sd '|' -)
+            IMAGES=$(echo "$IMAGES" | grep -vE "$EXCLUDE_PATTERN" || true)
+          fi
 
           if [ -n "$IMAGES" ]; then
             JSON_ARRAY=$(echo "$IMAGES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
