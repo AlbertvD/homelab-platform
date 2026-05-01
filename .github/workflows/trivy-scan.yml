@@ -31,6 +31,17 @@ on:
         required: false
         type: string
         default: 'ubuntu-latest'
+      changed_services:
+        description: >
+          Comma-separated list of service directory names (under services/) that
+          changed in this PR (e.g. "openbrain,security-mcp"). When non-empty,
+          detection is scoped to those service trees only, cutting matrix size
+          for PRs that touch a subset of services. Empty (default) = scan
+          everything, preserving the current full-repo behavior for cron /
+          push-to-main / self-CI.
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       image:
@@ -58,6 +69,7 @@ jobs:
         id: find
         env:
           INPUT_IMAGE: ${{ inputs.image }}
+          CHANGED_SERVICES: ${{ inputs.changed_services }}
         run: |
           # If explicit image provided, use that
           if [ -n "$INPUT_IMAGE" ]; then
@@ -67,8 +79,40 @@ jobs:
             exit 0
           fi
 
+          # Build the list of directories to search.
+          # When changed_services is non-empty, restrict to each named service
+          # tree under services/ plus the "Indonesian app/" directory if the
+          # special token "Indonesian app" appears in the list.
+          # When empty, fall back to the whole repo (current behaviour).
+          SEARCH_DIRS=()
+          if [ -n "$CHANGED_SERVICES" ]; then
+            IFS=',' read -ra SERVICE_NAMES <<< "$CHANGED_SERVICES"
+            for svc in "${SERVICE_NAMES[@]}"; do
+              svc="$(echo "$svc" | xargs)"  # trim whitespace
+              if [ "$svc" = "Indonesian app" ]; then
+                # Indonesian app lives at repo root, not under services/
+                [ -d "Indonesian app" ] && SEARCH_DIRS+=("Indonesian app")
+              elif [ -d "services/$svc" ]; then
+                SEARCH_DIRS+=("services/$svc")
+              fi
+            done
+          fi
+
+          # Determine find/grep roots: scoped dirs or repo root
+          if [ ${#SEARCH_DIRS[@]} -gt 0 ]; then
+            ROOTS=("${SEARCH_DIRS[@]}")
+            SCOPE_NOTE="scoped to: ${SEARCH_DIRS[*]}"
+          else
+            ROOTS=(".")
+            SCOPE_NOTE="full repo"
+          fi
+          echo "Detection scope: $SCOPE_NOTE"
+
           # Find Dockerfiles for filesystem scanning
-          DOCKERFILES=$(find . -name "Dockerfile" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -20)
+          DOCKERFILES=$(find "${ROOTS[@]}" -name "Dockerfile" \
+            -not -path "*/node_modules/*" \
+            -not -path "*/.git/*" \
+            2>/dev/null | head -20)
 
           if [ -n "$DOCKERFILES" ]; then
             JSON_ARRAY=$(echo "$DOCKERFILES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
@@ -80,7 +124,10 @@ jobs:
           fi
 
           # Check compose files for image references
-          IMAGES=$(grep -rh "image:" . --include="compose.yml" --include="docker-compose.yml" 2>/dev/null | \
+          IMAGES=$(grep -rh "image:" "${ROOTS[@]}" \
+            --include="compose.yml" \
+            --include="docker-compose.yml" \
+            2>/dev/null | \
             grep -oP 'image:\s*\K[^\s]+' | \
             grep -v '\${' | \
             sort -u | \
