@@ -313,7 +313,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security
         if: always() && hashFiles('results/semgrep.sarif') != ''
-        uses: github/codeql-action/upload-sarif@480db559a14342288b67e54bd959dd52dc3ee68f # v3
+        uses: github/codeql-action/upload-sarif@0daab03d71ff584ef619d027a3fd9146679c5d84 # v3
         with:
           sarif_file: results/semgrep.sarif
           category: semgrep-sast
