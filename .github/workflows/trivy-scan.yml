@@ -40,6 +40,13 @@ on:
         required: false
         type: string
         default: ''
+      trivy_cache_dir:
+        description: >
+          Directory for the Trivy DB/cache. The default only exists in the
+          myoung34 self-hosted runner image; override on other runners.
+        required: false
+        type: string
+        default: '/runner/_work/_tool/trivy-cache'
   workflow_dispatch:
     inputs:
       image:
@@ -127,7 +134,7 @@ jobs:
       - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.69.3 - pinned due to supply chain compromise in v0.69.4
         env:
-          TRIVY_CACHE_DIR: /runner/_work/_tool/trivy-cache
+          TRIVY_CACHE_DIR: ${{ inputs.trivy_cache_dir || '/runner/_work/_tool/trivy-cache' }}
         with:
           scan-type: 'fs'
           scan-ref: ${{ matrix.dockerfile }}
@@ -179,7 +186,7 @@ jobs:
       - name: Run Trivy image scan
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.69.3 - pinned due to supply chain compromise in v0.69.4
         env:
-          TRIVY_CACHE_DIR: /runner/_work/_tool/trivy-cache
+          TRIVY_CACHE_DIR: ${{ inputs.trivy_cache_dir || '/runner/_work/_tool/trivy-cache' }}
         with:
           image-ref: ${{ matrix.image }}
           severity: ${{ inputs.severity }}
