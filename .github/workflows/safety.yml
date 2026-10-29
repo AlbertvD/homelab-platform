@@ -74,13 +74,15 @@ jobs:
 
   gitleaks:
     name: Secret Detection
-    uses: AlbertvD/homelab-platform/.github/workflows/gitleaks.yml@v1
+    # Pinned to a SHA (not the movable v1 tag); bump when gitleaks.yml changes.
+    uses: AlbertvD/homelab-platform/.github/workflows/gitleaks.yml@cf5f7735eb3512ed2dec00eb45c33fca91131542 # v1
     with:
       runner: ${{ inputs.runner }}
 
   semgrep:
     name: SAST
-    uses: AlbertvD/homelab-platform/.github/workflows/semgrep.yml@v1
+    # Pinned to a SHA (not the movable v1 tag); bump when semgrep.yml changes.
+    uses: AlbertvD/homelab-platform/.github/workflows/semgrep.yml@cf5f7735eb3512ed2dec00eb45c33fca91131542 # v1
     with:
       runner: ${{ inputs.runner }}
     secrets:
