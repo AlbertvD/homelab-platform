@@ -17,6 +17,8 @@ on:
         required: true
       OPENBRAIN_KEY:
         required: false
+      SEMGREP_APP_TOKEN:
+        required: false
     # Note: OPENBRAIN_URL is accessed via vars.OPENBRAIN_URL in job steps.
     # workflow_call does not support a vars: block — variables pass through automatically.
 
@@ -29,8 +31,20 @@ jobs:
     steps:
       - name: Get platform HEAD SHA
         id: sha
+        env:
+          PLATFORM_TOKEN: ${{ secrets.PLATFORM_TOKEN }}
         run: |
-          SHA=$(git ls-remote https://x-access-token:${{ secrets.PLATFORM_TOKEN }}@github.com/AlbertvD/homelab-platform.git HEAD | cut -f1)
+          set -euo pipefail
+          # Token goes via git config env vars (not argv, not the URL).
+          AUTH=$(printf 'x-access-token:%s' "$PLATFORM_TOKEN" | base64 | tr -d '\n')
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraHeader
+          export GIT_CONFIG_VALUE_0="Authorization: basic $AUTH"
+          SHA=$(git ls-remote https://github.com/AlbertvD/homelab-platform.git HEAD | cut -f1)
+          if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Failed to resolve homelab-platform HEAD SHA"
+            exit 1
+          fi
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
   destructive-check:
@@ -49,6 +63,7 @@ jobs:
           ref: ${{ needs.resolve-platform.outputs.platform_sha }}
           path: .platform
           token: ${{ secrets.PLATFORM_TOKEN }}
+          persist-credentials: false
       - name: Run destructive operation check
         run: bash .platform/evals/destructive-op-check.sh
 
@@ -69,6 +84,7 @@ jobs:
           ref: ${{ needs.resolve-platform.outputs.platform_sha }}
           path: .platform
           token: ${{ secrets.PLATFORM_TOKEN }}
+          persist-credentials: false
       - name: Run compose validation
         run: bash .platform/evals/compose-validate.sh
 
@@ -105,6 +121,7 @@ jobs:
           ref: ${{ needs.resolve-platform.outputs.platform_sha }}
           path: .platform
           token: ${{ secrets.PLATFORM_TOKEN }}
+          persist-credentials: false
       - name: Query OpenBrain for relevant lessons
         env:
           OPENBRAIN_URL: ${{ vars.OPENBRAIN_URL }}
@@ -126,6 +143,7 @@ jobs:
           ref: ${{ needs.resolve-platform.outputs.platform_sha }}
           path: .platform
           token: ${{ secrets.PLATFORM_TOKEN }}
+          persist-credentials: false
       - name: Capture failure lesson
         env:
           OPENBRAIN_URL: ${{ vars.OPENBRAIN_URL }}

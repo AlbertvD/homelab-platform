@@ -103,6 +103,7 @@ jobs:
           repository: AlbertvD/homelab-platform
           path: .platform
           token: ${{ secrets.PLATFORM_TOKEN }}
+          persist-credentials: false
 
       - name: Build config string
         id: config
