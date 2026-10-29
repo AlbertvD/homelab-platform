@@ -17,6 +17,8 @@ on:
         required: true
       OPENBRAIN_KEY:
         required: false
+      SEMGREP_APP_TOKEN:
+        required: false
     # Note: OPENBRAIN_URL is accessed via vars.OPENBRAIN_URL in job steps.
     # workflow_call does not support a vars: block — variables pass through automatically.
 
@@ -29,8 +31,20 @@ jobs:
     steps:
       - name: Get platform HEAD SHA
         id: sha
+        env:
+          PLATFORM_TOKEN: ${{ secrets.PLATFORM_TOKEN }}
         run: |
-          SHA=$(git ls-remote https://x-access-token:${{ secrets.PLATFORM_TOKEN }}@github.com/AlbertvD/homelab-platform.git HEAD | cut -f1)
+          set -euo pipefail
+          # Token goes via git config env vars (not argv, not the URL).
+          AUTH=$(printf 'x-access-token:%s' "$PLATFORM_TOKEN" | base64 | tr -d '\n')
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraHeader
+          export GIT_CONFIG_VALUE_0="Authorization: basic $AUTH"
+          SHA=$(git ls-remote https://github.com/AlbertvD/homelab-platform.git HEAD | cut -f1)
+          if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Failed to resolve homelab-platform HEAD SHA"
+            exit 1
+          fi
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
   destructive-check:
@@ -41,17 +55,15 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        id: platform-cache
-        with:
-          path: .platform
-          key: platform-${{ needs.resolve-platform.outputs.platform_sha }}
+      # Always checked out at the resolved SHA, never restored from actions/cache:
+      # a cache entry could be poisoned by PR code and its scripts run with secrets.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        if: steps.platform-cache.outputs.cache-hit != 'true'
         with:
           repository: AlbertvD/homelab-platform
+          ref: ${{ needs.resolve-platform.outputs.platform_sha }}
           path: .platform
           token: ${{ secrets.PLATFORM_TOKEN }}
+          persist-credentials: false
       - name: Run destructive operation check
         run: bash .platform/evals/destructive-op-check.sh
 
@@ -64,29 +76,29 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        id: platform-cache
-        with:
-          path: .platform
-          key: platform-${{ needs.resolve-platform.outputs.platform_sha }}
+      # Always checked out at the resolved SHA, never restored from actions/cache:
+      # a cache entry could be poisoned by PR code and its scripts run with secrets.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        if: steps.platform-cache.outputs.cache-hit != 'true'
         with:
           repository: AlbertvD/homelab-platform
+          ref: ${{ needs.resolve-platform.outputs.platform_sha }}
           path: .platform
           token: ${{ secrets.PLATFORM_TOKEN }}
+          persist-credentials: false
       - name: Run compose validation
         run: bash .platform/evals/compose-validate.sh
 
   gitleaks:
     name: Secret Detection
-    uses: AlbertvD/homelab-platform/.github/workflows/gitleaks.yml@v1
+    # Pinned to a SHA (not the movable v1 tag); bump when gitleaks.yml changes.
+    uses: AlbertvD/homelab-platform/.github/workflows/gitleaks.yml@cf5f7735eb3512ed2dec00eb45c33fca91131542 # v1
     with:
       runner: ${{ inputs.runner }}
 
   semgrep:
     name: SAST
-    uses: AlbertvD/homelab-platform/.github/workflows/semgrep.yml@v1
+    # Pinned to a SHA (not the movable v1 tag); bump when semgrep.yml changes.
+    uses: AlbertvD/homelab-platform/.github/workflows/semgrep.yml@cf5f7735eb3512ed2dec00eb45c33fca91131542 # v1
     with:
       runner: ${{ inputs.runner }}
     secrets:
@@ -101,17 +113,15 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        id: platform-cache
-        with:
-          path: .platform
-          key: platform-${{ needs.resolve-platform.outputs.platform_sha }}
+      # Always checked out at the resolved SHA, never restored from actions/cache:
+      # a cache entry could be poisoned by PR code and its scripts run with secrets.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        if: steps.platform-cache.outputs.cache-hit != 'true'
         with:
           repository: AlbertvD/homelab-platform
+          ref: ${{ needs.resolve-platform.outputs.platform_sha }}
           path: .platform
           token: ${{ secrets.PLATFORM_TOKEN }}
+          persist-credentials: false
       - name: Query OpenBrain for relevant lessons
         env:
           OPENBRAIN_URL: ${{ vars.OPENBRAIN_URL }}
@@ -125,17 +135,15 @@ jobs:
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        id: platform-cache
-        with:
-          path: .platform
-          key: platform-${{ needs.resolve-platform.outputs.platform_sha }}
+      # Always checked out at the resolved SHA, never restored from actions/cache:
+      # a cache entry could be poisoned by PR code and its scripts run with secrets.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        if: steps.platform-cache.outputs.cache-hit != 'true'
         with:
           repository: AlbertvD/homelab-platform
+          ref: ${{ needs.resolve-platform.outputs.platform_sha }}
           path: .platform
           token: ${{ secrets.PLATFORM_TOKEN }}
+          persist-credentials: false
       - name: Capture failure lesson
         env:
           OPENBRAIN_URL: ${{ vars.OPENBRAIN_URL }}
