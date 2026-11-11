@@ -52,12 +52,12 @@ jobs:
     needs: resolve-platform
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
       # Always checked out at the resolved SHA, never restored from actions/cache:
       # a cache entry could be poisoned by PR code and its scripts run with secrets.
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           repository: AlbertvD/homelab-platform
           ref: ${{ needs.resolve-platform.outputs.platform_sha }}
@@ -73,12 +73,12 @@ jobs:
     needs: resolve-platform
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
       # Always checked out at the resolved SHA, never restored from actions/cache:
       # a cache entry could be poisoned by PR code and its scripts run with secrets.
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           repository: AlbertvD/homelab-platform
           ref: ${{ needs.resolve-platform.outputs.platform_sha }}
@@ -110,12 +110,12 @@ jobs:
     needs: resolve-platform
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
       # Always checked out at the resolved SHA, never restored from actions/cache:
       # a cache entry could be poisoned by PR code and its scripts run with secrets.
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           repository: AlbertvD/homelab-platform
           ref: ${{ needs.resolve-platform.outputs.platform_sha }}
@@ -134,10 +134,10 @@ jobs:
     needs: [resolve-platform, destructive-check, compose-validate, gitleaks, semgrep, lesson-check]
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       # Always checked out at the resolved SHA, never restored from actions/cache:
       # a cache entry could be poisoned by PR code and its scripts run with secrets.
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           repository: AlbertvD/homelab-platform
           ref: ${{ needs.resolve-platform.outputs.platform_sha }}
